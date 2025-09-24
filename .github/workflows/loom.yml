@@ -99,7 +99,7 @@ jobs:
   loom-util-sync:
     name: loom tokio-util::sync
     # base_ref is null when it's not a pull request
-    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-util-sync') || (github.base_ref == null))
+#    if: github.repository_owner == 'tokio-rs' && (contains(github.event.pull_request.labels.*.name, 'R-loom-util-sync') || (github.base_ref == null))
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
