@@ -6,28 +6,29 @@ cfg_rt! {
             pin::Pin,
             task::{Context, Poll},
         };
+        use std::mem;
         use pin_project_lite::pin_project;
         use std::future::Future;
 
         #[inline]
         pub(crate) fn task<F>(task: F, kind: &'static str, meta: SpawnMeta<'_>, id: u64) -> Instrumented<F> {
-            fn get_meta(spawn_meta: SpawnMeta<'_>, id: u64) -> (u64, &str, usize, &'static str, u32, u32) {
-                (
+            fn probe(kind: &'static str, meta: SpawnMeta<'_>, id: u64, size: usize) {
+                probes::task__start!(|| (
                     id,
-                    spawn_meta.name.unwrap_or_default(),
-                    spawn_meta.original_size,
-                    spawn_meta.spawned_at.0.file(),
-                    spawn_meta.spawned_at.0.line(),
-                    spawn_meta.spawned_at.0.column(),
-                )
+                    (kind == "task") as u8,
+                    size,
+                    meta.original_size,
+                ));
+                probes::task__details!(|| (
+                    id,
+                    meta.name.unwrap_or_default(),
+                    meta.spawned_at.0.file(),
+                    meta.spawned_at.0.line(),
+                    meta.spawned_at.0.column(),
+                ));
             }
 
-            // usdt only supports up to 6 args, so we need to split this into two.
-            if kind == "task" {
-                probes::task__spawn!(|| get_meta(meta, id));
-            } else if kind == "block_on" {
-                probes::task__block_on!(|| get_meta(meta, id));
-            }
+            probe(kind, meta, id, mem::size_of::<F>());
 
             Instrumented {
                 inner: task,
@@ -66,8 +67,11 @@ cfg_rt! {
         #[usdt::provider(provider = "tokio")]
         #[allow(non_snake_case)]
         pub(crate) mod probes {
-            fn task__spawn(task_id: u64, name: &str, size: usize, file: &str, line: u32, col: u32) {}
-            fn task__block_on(task_id: u64, name: &str, size: usize, file: &str, line: u32, col: u32) {}
+            fn task__details(task_id: u64, name: &str, file: &str, line: u32, col: u32) {}
+
+            // spwaned == 0 for block_on
+            // spawned == 1 for task
+            fn task__start(task_id: u64, spawned: u8, size: usize, original_size: usize) {}
             fn task__poll__start(task_id: u64) {}
             fn task__poll__end(task_id: u64) {}
             fn task__terminate(task_id: u64) {}
