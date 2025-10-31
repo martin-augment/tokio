@@ -537,8 +537,9 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::unnecessary_cast)]
     fn into_c_int() {
         let value: std::os::raw::c_int = SignalKind::interrupt().into();
-        assert_eq!(value, libc::SIGINT as _);
+        assert_eq!(value, libc::SIGINT as i32);
     }
 }
