@@ -441,6 +441,7 @@ cfg_rt! {
                 ))]
                 let future = task::trace::Trace::root(future);
                 let id = task::Id::next();
+                let future = crate::util::usdt::task(future, "task", meta, id.as_u64());
                 let task = crate::util::trace::task(future, "task", meta, id.as_u64());
 
                 // safety: we have verified that this is a `LocalRuntime` owned by the current thread
@@ -1040,6 +1041,7 @@ impl Context {
         F::Output: 'static,
     {
         let id = crate::runtime::task::Id::next();
+        let future = crate::util::usdt::task(future, "local", meta, id.as_u64());
         let future = crate::util::trace::task(future, "local", meta, id.as_u64());
 
         // Safety: called from the thread that owns the `LocalSet`

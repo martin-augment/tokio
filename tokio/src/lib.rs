@@ -351,6 +351,7 @@
 //! Some feature flags are only available when specifying the `tokio_unstable` flag:
 //!
 //! - `tracing`: Enables tracing events.
+//! - `usdt`: Enables USDT probes.
 //!
 //! Likewise, some parts of the API are only available with the same flag:
 //!

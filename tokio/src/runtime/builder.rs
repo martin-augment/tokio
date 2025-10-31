@@ -940,6 +940,9 @@ impl Builder {
     /// # }
     /// ```
     pub fn build(&mut self) -> io::Result<Runtime> {
+        #[cfg(all(tokio_unstable, feature = "usdt"))]
+        usdt::register_probes().map_err(|error| io::Error::new(io::ErrorKind::Other, error))?;
+
         match &self.kind {
             Kind::CurrentThread => self.build_current_thread_runtime(),
             #[cfg(feature = "rt-multi-thread")]
