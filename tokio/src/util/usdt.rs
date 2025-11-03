@@ -10,7 +10,7 @@ cfg_rt! {
         use std::future::Future;
         use std::mem;
 
-        #[cfg(target_os = "macos")]
+        #[cfg(all(target_os = "macos", any(target_arch = "x86_64", target_arch = "aarch64")))]
         #[path = "usdt/macos.rs"]
         pub(crate) mod usdt_impl;
 
@@ -18,9 +18,13 @@ cfg_rt! {
         #[path = "usdt/stapsdt_x86_64.rs"]
         pub(crate) mod usdt_impl;
 
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        #[path = "usdt/stapsdt_aarch64.rs"]
+        pub(crate) mod usdt_impl;
+
         #[cfg(not(any(
-            target_os = "macos",
-            all(target_os = "linux", target_arch = "x86_64"),
+            all(target_os = "macos", any(target_arch = "x86_64", target_arch = "aarch64")),
+            all(target_os = "linux", any(target_arch = "x86_64", target_arch = "aarch64")),
         )))]
         compile_error!(
             "The `usdt` feature is only currently supported on \
