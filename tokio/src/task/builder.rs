@@ -61,7 +61,7 @@ use std::{future::Future, io, mem};
 #[derive(Default, Debug)]
 #[cfg_attr(
     docsrs,
-    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt))))
 )]
 pub struct Builder<'a> {
     name: Option<&'a str>,

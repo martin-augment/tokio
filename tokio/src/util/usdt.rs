@@ -6,29 +6,37 @@ cfg_rt! {
             pin::Pin,
             task::{Context, Poll},
         };
-        use std::mem;
         use pin_project_lite::pin_project;
         use std::future::Future;
+        use std::mem;
+
+        #[cfg(target_os = "macos")]
+        #[path = "usdt/macos.rs"]
+        pub(crate) mod usdt_impl;
+
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        #[path = "usdt/stapsdt_x86_64.rs"]
+        pub(crate) mod usdt_impl;
+
+        #[cfg(not(any(
+            target_os = "macos",
+            all(target_os = "linux", target_arch = "x86_64"),
+        )))]
+        compile_error!(
+            "The `usdt` feature is only currently supported on \
+linux/macos, on `aarch64` and `x86_64`."
+);
 
         #[inline]
         pub(crate) fn task<F>(task: F, kind: &'static str, meta: SpawnMeta<'_>, id: u64) -> Instrumented<F> {
-            fn probe(kind: &'static str, meta: SpawnMeta<'_>, id: u64, size: usize) {
-                probes::task__start!(|| (
-                    id,
-                    (kind == "task") as u8,
-                    size,
-                    meta.original_size,
-                ));
-                probes::task__details!(|| (
-                    id,
-                    meta.name.unwrap_or_default(),
-                    meta.spawned_at.0.file(),
-                    meta.spawned_at.0.line(),
-                    meta.spawned_at.0.column(),
-                ));
-            }
-
-            probe(kind, meta, id, mem::size_of::<F>());
+            usdt_impl::task_start(id, (kind == "task") as u8, mem::size_of::<F>(), meta.original_size);
+            usdt_impl::task_details(
+                id,
+                meta.name.unwrap_or_default(),
+                meta.spawned_at.0.file(),
+                meta.spawned_at.0.line(),
+                meta.spawned_at.0.column(),
+            );
 
             Instrumented {
                 inner: task,
@@ -47,7 +55,7 @@ cfg_rt! {
             impl<F> PinnedDrop for Instrumented<F> {
                 fn drop(this: Pin<&mut Self>) {
                     let this = this.project();
-                    probes::task__terminate!(|| *this.task_id);
+                    usdt_impl::task_terminate(*this.task_id);
                 }
             }
         }
@@ -57,28 +65,11 @@ cfg_rt! {
 
             fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
                 let this = self.project();
-                probes::task__poll__start!(|| *this.task_id);
+                usdt_impl::task_poll_start(*this.task_id);
                 let res = this.inner.poll(cx);
-                probes::task__poll__end!(|| *this.task_id);
+                usdt_impl::task_poll_end(*this.task_id);
                 res
             }
-        }
-
-        #[usdt::provider(provider = "tokio")]
-        #[allow(non_snake_case)]
-        pub(crate) mod probes {
-            fn task__details(task_id: u64, name: &str, file: &str, line: u32, col: u32) {}
-
-            // spwaned == 0 for block_on
-            // spawned == 1 for task
-            fn task__start(task_id: u64, spawned: u8, size: usize, original_size: usize) {}
-            fn task__poll__start(task_id: u64) {}
-            fn task__poll__end(task_id: u64) {}
-            fn task__terminate(task_id: u64) {}
-
-            fn task__waker__clone(task_id: u64) {}
-            fn task__waker__wake(task_id: u64) {}
-            fn task__waker__drop(task_id: u64) {}
         }
     }
 

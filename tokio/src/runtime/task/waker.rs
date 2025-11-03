@@ -67,14 +67,15 @@ cfg_not_trace! {
 cfg_usdt! {
     macro_rules! usdt {
         ($header:expr, $op:expr) => {
+            let id = Header::get_id($header).as_u64();
             match $op {
-                "clone" => crate::util::usdt::probes::task__waker__clone!(|| Header::get_id($header).as_u64()),
-                "drop" => crate::util::usdt::probes::task__waker__drop!(|| Header::get_id($header).as_u64()),
+                "clone" => crate::util::usdt::usdt_impl::waker_clone(id),
+                "drop" => crate::util::usdt::usdt_impl::waker_drop(id),
                 "wake" => {
-                    crate::util::usdt::probes::task__waker__wake!(|| Header::get_id($header).as_u64());
-                    crate::util::usdt::probes::task__waker__drop!(|| Header::get_id($header).as_u64());
+                    crate::util::usdt::usdt_impl::waker_wake(id);
+                    crate::util::usdt::usdt_impl::waker_drop(id);
                 }
-                "wake_by_ref" => crate::util::usdt::probes::task__waker__wake!(|| Header::get_id($header).as_u64()),
+                "wake_by_ref" => crate::util::usdt::usdt_impl::waker_wake(id),
                 _ => {}
             }
         }

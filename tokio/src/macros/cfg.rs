@@ -596,8 +596,8 @@ macro_rules! cfg_not_trace {
 macro_rules! cfg_usdt {
     ($($item:item)*) => {
         $(
-            #[cfg(all(tokio_unstable, feature = "usdt"))]
-            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, feature = "usdt"))))]
+            #[cfg(all(tokio_unstable, tokio_usdt))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, tokio_usdt))))]
             $item
         )*
     };
@@ -606,7 +606,7 @@ macro_rules! cfg_usdt {
 macro_rules! cfg_not_usdt {
     ($($item:item)*) => {
         $(
-            #[cfg(any(not(tokio_unstable), not(feature = "usdt")))]
+            #[cfg(any(not(tokio_unstable), not(tokio_usdt)))]
             $item
         )*
     }
@@ -615,8 +615,8 @@ macro_rules! cfg_not_usdt {
 macro_rules! cfg_trace_or_usdt {
     ($($item:item)*) => {
         $(
-            #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
-            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))))]
+            #[cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))]
+            #[cfg_attr(docsrs, doc(cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))))]
             $item
         )*
     };

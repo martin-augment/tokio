@@ -28,5 +28,6 @@ unexpected_cfgs = { level = "warn", check-cfg = [
   'cfg(tokio_no_parking_lot)',
   'cfg(tokio_no_tuning_tests)',
   'cfg(tokio_unstable)',
+  'cfg(tokio_usdt)',
   'cfg(target_os, values("cygwin"))',
 ] }

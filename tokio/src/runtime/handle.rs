@@ -359,9 +359,9 @@ impl Handle {
         ))]
         let future = super::task::trace::Trace::root(future);
 
-        #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+        #[cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))]
         let id = super::task::Id::next().as_u64();
-        #[cfg(all(tokio_unstable, feature = "usdt"))]
+        #[cfg(all(tokio_unstable, tokio_usdt))]
         let future = crate::util::usdt::task(future, "block_on", _meta, id);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "block_on", _meta, id);
@@ -388,7 +388,7 @@ impl Handle {
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
-        #[cfg(all(tokio_unstable, feature = "usdt"))]
+        #[cfg(all(tokio_unstable, tokio_usdt))]
         let future = crate::util::usdt::task(future, "task", meta, id.as_u64());
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());
@@ -415,7 +415,7 @@ impl Handle {
             any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")
         ))]
         let future = super::task::trace::Trace::root(future);
-        #[cfg(all(tokio_unstable, feature = "usdt"))]
+        #[cfg(all(tokio_unstable, tokio_usdt))]
         let future = crate::util::usdt::task(future, "task", meta, id.as_u64());
         #[cfg(all(tokio_unstable, feature = "tracing"))]
         let future = crate::util::trace::task(future, "task", meta, id.as_u64());

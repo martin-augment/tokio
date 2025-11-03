@@ -69,10 +69,10 @@ pub struct JoinSet<T> {
 /// than on the current default runtime.
 ///
 /// [`task::Builder`]: crate::task::Builder
-#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+#[cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))]
 #[cfg_attr(
     docsrs,
-    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt))))
 )]
 #[must_use = "builders do nothing unless used to spawn a task"]
 pub struct Builder<'a, T> {
@@ -120,10 +120,10 @@ impl<T: 'static> JoinSet<T> {
     ///     Ok(())
     /// }
     /// ```
-    #[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+    #[cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))]
     #[cfg_attr(
         docsrs,
-        doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+        doc(cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt))))
     )]
     pub fn build_task(&mut self) -> Builder<'_, T> {
         Builder {
@@ -657,10 +657,10 @@ where
 
 // === impl Builder ===
 
-#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+#[cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))]
 #[cfg_attr(
     docsrs,
-    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt))))
 )]
 impl<'a, T: 'static> Builder<'a, T> {
     /// Assigns a name to the task which will be spawned.
@@ -803,10 +803,10 @@ impl<'a, T: 'static> Builder<'a, T> {
 
 // Manual `Debug` impl so that `Builder` is `Debug` regardless of whether `T` is
 // `Debug`.
-#[cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt")))]
+#[cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))]
 #[cfg_attr(
     docsrs,
-    doc(cfg(all(tokio_unstable, any(feature = "tracing", feature = "usdt"))))
+    doc(cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt))))
 )]
 impl<'a, T> fmt::Debug for Builder<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
