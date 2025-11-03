@@ -41,7 +41,7 @@ pub(super) fn task_details(task_id: u64, name: &str, file: &str, line: u32, col:
                         .popsection",
                 in("x0") (task_id as usize),
                 in("x1") (name0.as_ptr() as usize),
-                in("x2") (arg_2.as_ptr() as usize),
+                in("x2") (file0.as_ptr() as usize),
                 in("x3") (line as usize),
                 in("x4") (col as usize),
                 options(nomem, nostack, preserves_flags),
