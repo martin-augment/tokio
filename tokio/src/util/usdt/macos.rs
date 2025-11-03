@@ -223,17 +223,17 @@ pub(super) fn task_start(task_id: u64, spawned: u8, size: usize, original_size: 
 }
 
 #[inline(always)]
-pub(super) fn task_poll_start(task_id: u64) {
+pub(crate) fn task_poll_start(task_id: u64) {
     unsafe { call_probe!(__task_poll_start, task_id as usize) }
 }
 
 #[inline(always)]
-pub(super) fn task_poll_end(task_id: u64) {
+pub(crate) fn task_poll_end(task_id: u64) {
     unsafe { call_probe!(__task_poll_end, task_id as usize) }
 }
 
 #[inline(always)]
-pub(super) fn task_terminate(task_id: u64) {
+pub(crate) fn task_terminate(task_id: u64) {
     unsafe { call_probe!(__task_terminate, task_id as usize) }
 }
 

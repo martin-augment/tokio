@@ -251,8 +251,18 @@ impl RawTask {
 
     /// Safety: mutual exclusion is required to call this function.
     pub(crate) fn poll(self) {
+        #[cfg(all(tokio_unstable, tokio_usdt))]
+        let id = unsafe { Header::get_id(self.header_ptr()) }.as_u64();
+
         let vtable = self.header().vtable;
+
+        #[cfg(all(tokio_unstable, tokio_usdt))]
+        crate::util::usdt::usdt_impl::task_poll_start(id);
+
         unsafe { (vtable.poll)(self.ptr) }
+
+        #[cfg(all(tokio_unstable, tokio_usdt))]
+        crate::util::usdt::usdt_impl::task_poll_end(id);
     }
 
     pub(super) fn schedule(self) {
@@ -261,10 +271,16 @@ impl RawTask {
     }
 
     pub(super) fn dealloc(self) {
+        #[cfg(all(tokio_unstable, tokio_usdt))]
+        let id = unsafe { Header::get_id(self.header_ptr()) }.as_u64();
+
         let vtable = self.header().vtable;
         unsafe {
             (vtable.dealloc)(self.ptr);
         }
+
+        #[cfg(all(tokio_unstable, tokio_usdt))]
+        crate::util::usdt::usdt_impl::task_terminate(id);
     }
 
     /// Safety: `dst` must be a `*mut Poll<super::Result<T::Output>>` where `T`
