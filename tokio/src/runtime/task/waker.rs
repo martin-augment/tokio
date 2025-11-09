@@ -64,9 +64,37 @@ cfg_not_trace! {
     }
 }
 
+cfg_usdt! {
+    macro_rules! usdt {
+        ($header:expr, $op:expr) => {
+            let id = Header::get_id($header).as_u64();
+            match $op {
+                "clone" => crate::util::usdt::usdt_impl::waker_clone(id),
+                "drop" => crate::util::usdt::usdt_impl::waker_drop(id),
+                "wake" => {
+                    crate::util::usdt::usdt_impl::waker_wake(id);
+                    crate::util::usdt::usdt_impl::waker_drop(id);
+                }
+                "wake_by_ref" => crate::util::usdt::usdt_impl::waker_wake(id),
+                _ => {}
+            }
+        }
+    }
+}
+
+cfg_not_usdt! {
+    macro_rules! usdt {
+        ($header:expr, $op:expr) => {
+            // noop
+            let _ = &$header;
+        }
+    }
+}
+
 unsafe fn clone_waker(ptr: *const ()) -> RawWaker {
     let header = NonNull::new_unchecked(ptr as *mut Header);
     trace!(header, "waker.clone");
+    usdt!(header, "clone");
     header.as_ref().state.ref_inc();
     raw_waker(header)
 }
@@ -74,6 +102,7 @@ unsafe fn clone_waker(ptr: *const ()) -> RawWaker {
 unsafe fn drop_waker(ptr: *const ()) {
     let ptr = NonNull::new_unchecked(ptr as *mut Header);
     trace!(ptr, "waker.drop");
+    usdt!(ptr, "drop");
     let raw = RawTask::from_raw(ptr);
     raw.drop_reference();
 }
@@ -81,6 +110,7 @@ unsafe fn drop_waker(ptr: *const ()) {
 unsafe fn wake_by_val(ptr: *const ()) {
     let ptr = NonNull::new_unchecked(ptr as *mut Header);
     trace!(ptr, "waker.wake");
+    usdt!(ptr, "wake");
     let raw = RawTask::from_raw(ptr);
     raw.wake_by_val();
 }
@@ -89,6 +119,7 @@ unsafe fn wake_by_val(ptr: *const ()) {
 unsafe fn wake_by_ref(ptr: *const ()) {
     let ptr = NonNull::new_unchecked(ptr as *mut Header);
     trace!(ptr, "waker.wake_by_ref");
+    usdt!(ptr, "wake_by_ref");
     let raw = RawTask::from_raw(ptr);
     raw.wake_by_ref();
 }

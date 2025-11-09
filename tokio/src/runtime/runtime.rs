@@ -354,13 +354,12 @@ impl Runtime {
         ))]
         let future = super::task::trace::Trace::root(future);
 
+        #[cfg(all(tokio_unstable, any(feature = "tracing", tokio_usdt)))]
+        let id = crate::runtime::task::Id::next().as_u64();
+        #[cfg(all(tokio_unstable, tokio_usdt))]
+        let future = crate::util::usdt::task(future, "block_on", _meta, id);
         #[cfg(all(tokio_unstable, feature = "tracing"))]
-        let future = crate::util::trace::task(
-            future,
-            "block_on",
-            _meta,
-            crate::runtime::task::Id::next().as_u64(),
-        );
+        let future = crate::util::trace::task(future, "block_on", _meta, id);
 
         let _enter = self.enter();
 

@@ -499,6 +499,9 @@ compile_error!(
 linux, on `aarch64`, `x86` and `x86_64`."
 );
 
+#[cfg(all(not(tokio_unstable), tokio_usdt))]
+compile_error!("The `tokio_usdt` feature requires `--cfg tokio_unstable`.");
+
 // Includes re-exports used by macros.
 //
 // This module is not intended to be part of the public API. In general, any

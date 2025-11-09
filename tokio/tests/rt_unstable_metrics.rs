@@ -302,7 +302,7 @@ fn worker_poll_count_and_time() {
     });
     drop(rt);
     // Account for the `block_on` task
-    let n = (0..metrics.num_workers())
+    let n: u64 = (0..metrics.num_workers())
         .map(|i| metrics.worker_poll_count(i))
         .sum();
 
@@ -358,7 +358,7 @@ fn log_histogram() {
         metrics.poll_time_histogram_bucket_range(118).end,
         Duration::from_nanos(u64::MAX)
     );
-    let n = (0..metrics.num_workers())
+    let n: u64 = (0..metrics.num_workers())
         .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
         .map(|(worker, bucket)| metrics.poll_time_histogram_bucket_count(worker, bucket))
         .sum();
@@ -463,7 +463,7 @@ fn worker_poll_count_histogram() {
         assert!(metrics.poll_time_histogram_enabled());
         assert_eq!(num_buckets, 3);
 
-        let n = (0..num_workers)
+        let n: u64 = (0..num_workers)
             .flat_map(|i| (0..num_buckets).map(move |j| (i, j)))
             .map(|(worker, bucket)| metrics.poll_time_histogram_bucket_count(worker, bucket))
             .sum();
