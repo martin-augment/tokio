@@ -44,18 +44,6 @@ async fn read_to_end_uring(
     let mut offset = 0;
     let start_cap = buf.capacity();
 
-    // if buffer has no room and no size_hint, start with a small probe_read from 0 offset
-    if (size_hint.is_none() || size_hint == Some(0)) && buf.capacity() - buf.len() < PROBE_SIZE {
-        let (size_read, r_fd, r_buf) = small_probe_read(fd, buf, &mut offset).await?;
-
-        if size_read == 0 {
-            return Ok(r_buf);
-        }
-
-        fd = r_fd;
-        buf = r_buf;
-    }
-
     loop {
         if buf.len() == buf.capacity() && buf.capacity() == start_cap {
             // The buffer might be an exact fit. Let's read into a probe buffer
