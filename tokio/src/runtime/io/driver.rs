@@ -5,8 +5,7 @@ cfg_signal_internal_and_unix! {
 cfg_io_uring! {
     mod uring;
     use uring::UringContext;
-    // TODO: Replace with std after https://github.com/rust-lang/rust/issues/109737
-    use once_cell::sync::OnceCell;
+    use crate::sync::OnceCell;
 }
 
 use crate::io::interest::Interest;

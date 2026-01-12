@@ -172,21 +172,28 @@ impl Handle {
     /// If either io_uring is unsupported or the opcode is unsupported,
     /// this returns `Ok(false)`.
     /// An error is returned if an io_uring syscall returns an unexpected error value.
-    pub(crate) fn check_and_init(&self, opcode: u8) -> io::Result<bool> {
-        let probe = self.uring_probe.get_or_try_init(|| {
-            let mut probe = Probe::new();
-            match self.try_init(&mut probe) {
-                Ok(()) => Ok(Some(probe)),
-                // If the system doesn't support io_uring, we set the probe to `None`.
-                Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => Ok(None),
-                // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
-                // In this case, we try to fall back to spawn_blocking for this and future operations.
-                // See also: https://github.com/tokio-rs/tokio/issues/7691
-                Err(e) if e.raw_os_error() == Some(libc::EPERM) => Ok(None),
-                // For other system errors, we just return it.
-                Err(e) => Err(e),
-            }
-        })?;
+    ///
+    /// TODO: This would like to be a synchronous function,
+    /// but we require `OnceLock::get_or_try_init`.
+    /// <https://github.com/rust-lang/rust/issues/109737>
+    pub(crate) async fn check_and_init(&self, opcode: u8) -> io::Result<bool> {
+        let probe = self
+            .uring_probe
+            .get_or_try_init(|| async {
+                let mut probe = Probe::new();
+                match self.try_init(&mut probe) {
+                    Ok(()) => Ok(Some(probe)),
+                    // If the system doesn't support io_uring, we set the probe to `None`.
+                    Err(e) if e.raw_os_error() == Some(libc::ENOSYS) => Ok(None),
+                    // If we get EPERM, io-uring syscalls may be blocked (for example, by seccomp).
+                    // In this case, we try to fall back to spawn_blocking for this and future operations.
+                    // See also: https://github.com/tokio-rs/tokio/issues/7691
+                    Err(e) if e.raw_os_error() == Some(libc::EPERM) => Ok(None),
+                    // For other system errors, we just return it.
+                    Err(e) => Err(e),
+                }
+            })
+            .await?;
 
         Ok(probe
             .as_ref()
@@ -214,10 +221,7 @@ impl Handle {
     /// Callers must ensure that parameters of the entry (such as buffer) are valid and will
     /// be valid for the entire duration of the operation, otherwise it may cause memory problems.
     pub(crate) unsafe fn register_op(&self, entry: Entry, waker: Waker) -> io::Result<usize> {
-        // Note: Maybe this check can be removed if upstream callers consistently use `check_and_init`.
-        if !self.check_and_init(entry.get_opcode() as u8)? {
-            return Err(io::Error::from_raw_os_error(libc::ENOSYS));
-        }
+        assert!(self.uring_probe.initialized());
 
         // Uring is initialized.
 
