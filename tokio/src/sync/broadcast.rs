@@ -887,19 +887,7 @@ impl<T> Sender<T> {
     /// }
     /// ```
     pub async fn closed(&self) {
-        loop {
-            let notified = self.shared.notify_last_rx_drop.notified();
-
-            {
-                // Ensure the lock drops if the channel isn't closed
-                let tail = self.shared.tail.lock();
-                if tail.closed {
-                    return;
-                }
-            }
-
-            notified.await;
-        }
+        self.shared.closed().await;
     }
 
     fn close_channel(&self) {
@@ -1053,6 +1041,22 @@ impl<T> Shared<T> {
 
         wakers.wake_all();
     }
+
+    async fn closed(&self) {
+        loop {
+            let notified = self.notify_last_rx_drop.notified();
+
+            {
+                // Ensure the lock drops if the channel isn't closed
+                let tail = self.tail.lock();
+                if tail.closed {
+                    return;
+                }
+            }
+
+            notified.await;
+        }
+    }
 }
 
 impl<T> Clone for Sender<T> {
@@ -1100,6 +1104,36 @@ impl<T> WeakSender<T> {
                 Err(prev_count) => tx_count = prev_count,
             }
         }
+    }
+
+    /// A future which completes when the number of [Receiver]s subscribed to this `Sender` reaches
+    /// zero.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use futures::FutureExt;
+    /// use tokio::sync::broadcast;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let (tx, mut rx1) = broadcast::channel::<u32>(16);
+    ///     let mut rx2 = tx.subscribe();
+    ///
+    ///     let _ = tx.send(10);
+    ///     let weak = tx.downgrade();
+    ///
+    ///     assert_eq!(rx1.recv().await.unwrap(), 10);
+    ///     drop(rx1);
+    ///     assert!(weak.closed().now_or_never().is_none());
+    ///
+    ///     assert_eq!(rx2.recv().await.unwrap(), 10);
+    ///     drop(rx2);
+    ///     assert!(weak.closed().now_or_never().is_some());
+    /// }
+    /// ```
+    pub async fn closed(&self) {
+        self.shared.closed().await;
     }
 
     /// Returns the number of [`Sender`] handles.
