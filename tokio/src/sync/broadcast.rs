@@ -1047,19 +1047,24 @@ impl<T> Shared<T> {
     }
 
     async fn closed_for_senders(&self) {
-        loop {
-            let notified = self.notify_last_rx_drop.notified();
+        crate::trace::async_trace_leaf().await;
 
-            {
-                // Ensure the lock drops if the channel isn't closed
-                let tail = self.tail.lock();
-                if tail.closed_for_senders {
-                    return;
+        cooperative(async {
+            loop {
+                let notified = self.notify_last_rx_drop.notified();
+
+                {
+                    // Ensure the lock drops if the channel isn't closed
+                    let tail = self.tail.lock();
+                    if tail.closed_for_senders {
+                        return;
+                    }
                 }
-            }
 
-            notified.await;
-        }
+                notified.await;
+            }
+        })
+        .await;
     }
 }
 
