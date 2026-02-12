@@ -15,7 +15,7 @@ pin_project! {
         #[pin]
         inner: R,
         // Add '_' to avoid conflicts with `limit` method.
-        limit_: u64,
+        pub(crate) limit_: u64,
     }
 }
 
@@ -86,20 +86,27 @@ impl<R: AsyncRead> AsyncRead for Take<R> {
         }
 
         let me = self.project();
+
         let mut b = buf.take(usize::try_from(*me.limit_).unwrap_or(usize::MAX));
+
+        let snapshot_before_poll = b.snapshot();
 
         let buf_ptr = b.filled().as_ptr();
         ready!(me.inner.poll_read(cx, &mut b))?;
         assert_eq!(b.filled().as_ptr(), buf_ptr);
 
-        let n = b.filled().len();
+        let snapshot_after_poll = b.snapshot();
 
-        // We need to update the original ReadBuf
-        unsafe {
-            buf.assume_init(n);
-        }
-        buf.advance(n);
-        *me.limit_ -= n as u64;
+        let n =
+            // SAFETY: `after_poll.filled - before_poll.filled` represents the exact number of bytes
+            // written into `b` by `poll_read`. Since `b` is a sub-buffer of `buf` created via `take()`,
+            // the written bytes directly correspond to the same memory region in the parent buffer.
+            // The snapshots are taken immediately before and after `poll_read`, ensuring no aliasing
+            // or race conditions. Therefore, it is safe to mark these bytes as initialized.
+            unsafe { buf.finalize_read_from_snapshots(snapshot_before_poll, snapshot_after_poll) }?;
+
+        *me.limit_ = me.limit_.saturating_sub(n as u64);
+
         Poll::Ready(Ok(()))
     }
 }
