@@ -58,6 +58,9 @@ pub struct Builder {
     enable_io: bool,
     nevents: usize,
 
+    #[cfg(all(tokio_unstable, feature = "io-uring"))]
+    uring_setup_sqpoll: Option<u32>,
+
     /// Whether or not to enable the time driver
     enable_time: bool,
 
@@ -274,6 +277,9 @@ impl Builder {
             // I/O defaults to "off"
             enable_io: false,
             nevents: 1024,
+
+            #[cfg(all(tokio_unstable, feature = "io-uring"))]
+            uring_setup_sqpoll: None,
 
             // Time defaults to "off"
             enable_time: false,
@@ -1598,6 +1604,13 @@ impl Builder {
         cfg.timer_flavor = TimerFlavor::Traditional;
         let (driver, driver_handle) = driver::Driver::new(cfg)?;
 
+        #[cfg(all(tokio_unstable, feature = "io-uring", target_os = "linux"))]
+        if let Some(idle) = self.uring_setup_sqpoll {
+            if let Some(io) = driver_handle.io.as_ref() {
+                io.setup_uring_sqpoll(idle);
+            }
+        }
+
         // Blocking pool
         let blocking_pool = blocking::create_blocking_pool(self, self.max_blocking_threads);
         let blocking_spawner = blocking_pool.spawner().clone();
@@ -1742,6 +1755,28 @@ cfg_io_uring! {
             self.enable_io = true;
             self
         }
+
+        /// Enables SQPOLL for the io_uring driver and sets the idle timeout.
+        ///
+        /// When SQPOLL is enabled, a kernel thread is created to poll the
+        /// submission queue. This can reduce syscall overhead.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use tokio::runtime;
+        ///
+        /// let rt = runtime::Builder::new_multi_thread()
+        ///     .enable_io_uring()
+        ///     .uring_setup_sqpoll(2000)
+        ///     .build()
+        ///     .unwrap();
+        /// ```
+        #[cfg_attr(docsrs, doc(cfg(feature = "io-uring")))]
+        pub fn uring_setup_sqpoll(&mut self, idle: u32) -> &mut Self {
+            self.uring_setup_sqpoll = Some(idle);
+            self
+        }
     }
 }
 
@@ -1780,6 +1815,13 @@ cfg_rt_multi_thread! {
             let worker_threads = self.worker_threads.unwrap_or_else(num_cpus);
 
             let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
+
+            #[cfg(all(tokio_unstable, feature = "io-uring", target_os = "linux"))]
+            if let Some(idle) = self.uring_setup_sqpoll {
+                if let Some(io) = driver_handle.io.as_ref() {
+                    io.setup_uring_sqpoll(idle);
+                }
+            }
 
             // Create the blocking pool
             let blocking_pool =
