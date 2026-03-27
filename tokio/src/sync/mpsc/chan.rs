@@ -415,7 +415,7 @@ impl<T, S: Semaphore> Rx<T, S> {
             try_recv!();
 
             if rx_fields.rx_closed && self.inner.semaphore.is_idle() {
-                assert!(buffer.is_empty());
+                assert!(buffer.len() == initial_length);
                 coop.made_progress();
                 Ready(0usize)
             } else {
