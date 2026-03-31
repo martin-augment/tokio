@@ -301,3 +301,15 @@ fn test_waker_update() {
 
     assert!(future.is_woken());
 }
+
+#[test]
+fn notify_one_has_priority_over_notify_waiters() {
+    use futures::FutureExt;
+    let notify = tokio::sync::Notify::new();
+    let notified1 = notify.notified();
+    notify.notify_waiters();
+    notify.notify_one();
+    assert!(notified1.now_or_never().is_some());
+    let notified2 = notify.notified();
+    assert!(notified2.now_or_never().is_some());
+}

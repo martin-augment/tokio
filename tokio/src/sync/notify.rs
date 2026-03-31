@@ -1118,6 +1118,11 @@ impl NotifiedProject<'_> {
                 State::Init => {
                     let curr = notify.state.load(SeqCst);
 
+                    if get_num_notify_waiters_calls(curr) != *notify_waiters_calls {
+                        *state = State::Done;
+                        continue 'outer_loop;
+                    }
+
                     // Optimistically try acquiring a pending notification
                     let res = notify.state.compare_exchange(
                         set_state(curr, NOTIFIED),
