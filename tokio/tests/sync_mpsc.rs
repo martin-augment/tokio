@@ -358,6 +358,30 @@ async fn send_recv_many_unbounded_capacity() {
     assert_eq!(expected, buffer);
 }
 
+#[maybe_tokio_test]
+async fn recv_many_with_non_empty_buffer_bounded_rx_closed_and_idle() {
+    let (_tx, mut rx) = mpsc::channel::<i32>(1);
+
+    let mut buffer: Vec<i32> = vec![1];
+
+    rx.close();
+
+    // Does not panic, no longer expecting an empty buffer (#7990).
+    rx.recv_many(&mut buffer, 1).await;
+}
+
+#[maybe_tokio_test]
+async fn recv_many_with_non_empty_buffer_unbounded_rx_closed_and_idle() {
+    let (_tx, mut rx) = mpsc::unbounded_channel::<i32>();
+
+    let mut buffer: Vec<i32> = vec![1];
+
+    rx.close();
+
+    // Does not panic, no longer expecting an empty buffer (#7990).
+    rx.recv_many(&mut buffer, 1).await;
+}
+
 #[tokio::test]
 #[cfg(feature = "full")]
 async fn async_send_recv_unbounded() {
