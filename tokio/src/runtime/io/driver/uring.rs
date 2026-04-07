@@ -2,12 +2,14 @@ use io_uring::{squeue::Entry, IoUring, Probe};
 use mio::unix::SourceFd;
 use slab::Slab;
 
+use crate::runtime::driver::op::CancelData;
+use crate::runtime::driver::op::CqeResult;
 use crate::runtime::driver::op::{Cancellable, Lifecycle};
 use crate::{io::Interest, loom::sync::Mutex};
 
 use super::{Handle, TOKEN_WAKEUP};
 
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::{io, mem, task::Waker};
 
 const DEFAULT_RING_SIZE: u32 = 256;
@@ -77,9 +79,14 @@ impl UringContext {
                     waker.wake_by_ref();
                     *ops.get_mut(idx).unwrap() = Lifecycle::Completed(cqe);
                 }
-                Some(Lifecycle::Cancelled(_)) => {
+                Some(Lifecycle::Cancelled(CancelData::Open(_))) => {
+                    if let Ok(fd) = CqeResult::from(cqe).result {
+                        // SAFETY: the successful CQE result provides
+                        // a non-negative integer, and the event is
+                        // related to an open operation.
+                        unsafe { OwnedFd::from_raw_fd(fd as i32) };
+                    }
                     // Op future was cancelled, so we discard the result.
-                    // We just remove the entry from the slab.
                     ops.remove(idx);
                 }
                 Some(other) => {
