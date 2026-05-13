@@ -141,9 +141,13 @@ impl Decoder for AnyDelimiterCodec {
             // there's no max_length set, we'll read to the end of the buffer.
             let read_to = cmp::min(self.max_length.saturating_add(1), buf.len());
 
-            let new_chunk_offset = buf[self.next_index..read_to]
-                .iter()
-                .position(|b| self.seek_delimiters.contains(b));
+            let haystack = &buf[self.next_index..read_to];
+            let new_chunk_offset = match self.seek_delimiters.as_slice() {
+                [d0] => memchr::memchr(*d0, haystack),
+                [d0, d1] => memchr::memchr2(*d0, *d1, haystack),
+                [d0, d1, d2] => memchr::memchr3(*d0, *d1, *d2, haystack),
+                delims => haystack.iter().position(|b| delims.contains(b)),
+            };
 
             match (self.is_discarding, new_chunk_offset) {
                 (true, Some(offset)) => {
