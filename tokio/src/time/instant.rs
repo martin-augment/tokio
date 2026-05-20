@@ -1,7 +1,6 @@
 #![allow(clippy::trivially_copy_pass_by_ref)]
 
 use std::fmt;
-use std::ops;
 use std::time::Duration;
 
 /// A measurement of a monotonically nondecreasing clock.
@@ -24,6 +23,11 @@ use std::time::Duration;
 ///
 /// The size of an `Instant` struct may vary depending on the target operating
 /// system.
+///
+/// `Instant` does not implement the panicking operations that `std::time::Instant`
+/// does (e.g. `Add<Duration>`) to ensure that calculations handle edge cases
+/// appropriately. If panicking operations are desired for convenience, use
+/// `std::time::Instant` and `From` or `Into` conversions as needed.
 ///
 /// # Note
 ///
@@ -59,7 +63,9 @@ impl Instant {
         // API does not provide a way to obtain max `Instant`
         // or convert specific date in the future to instant.
         // 1000 years overflows on macOS, 100 years overflows on FreeBSD.
-        Self::now() + Duration::from_secs(86400 * 365 * 30)
+        Self::now()
+            .checked_add(Duration::from_secs(86400 * 365 * 30))
+            .expect("30 years should not overflow")
     }
 
     /// Convert the value into a `std::time::Instant`.
@@ -69,6 +75,8 @@ impl Instant {
 
     /// Returns the amount of time elapsed from another instant to this one, or
     /// zero duration if that instant is later than this one.
+    ///
+    /// Equivalent to [`Self::saturating_duration_since`].
     pub fn duration_since(&self, earlier: Instant) -> Duration {
         self.std.saturating_duration_since(earlier.std)
     }
@@ -148,6 +156,13 @@ impl Instant {
     pub fn checked_sub(&self, duration: Duration) -> Option<Instant> {
         self.std.checked_sub(duration).map(Instant::from_std)
     }
+
+    /// Returns `self` advanced by `duration`, unless that would overflow the underlying
+    /// representation used by `Instant`, in which case an `Instant` decades in the future is
+    /// returned.
+    pub fn saturating_add(&self, duration: Duration) -> Self {
+        self.checked_add(duration).unwrap_or_else(Self::far_future)
+    }
 }
 
 impl From<std::time::Instant> for Instant {
@@ -159,42 +174,6 @@ impl From<std::time::Instant> for Instant {
 impl From<Instant> for std::time::Instant {
     fn from(time: Instant) -> std::time::Instant {
         time.into_std()
-    }
-}
-
-impl ops::Add<Duration> for Instant {
-    type Output = Instant;
-
-    fn add(self, other: Duration) -> Instant {
-        Instant::from_std(self.std + other)
-    }
-}
-
-impl ops::AddAssign<Duration> for Instant {
-    fn add_assign(&mut self, rhs: Duration) {
-        *self = *self + rhs;
-    }
-}
-
-impl ops::Sub for Instant {
-    type Output = Duration;
-
-    fn sub(self, rhs: Instant) -> Duration {
-        self.std.saturating_duration_since(rhs.std)
-    }
-}
-
-impl ops::Sub<Duration> for Instant {
-    type Output = Instant;
-
-    fn sub(self, rhs: Duration) -> Instant {
-        Instant::from_std(std::time::Instant::sub(self.std, rhs))
-    }
-}
-
-impl ops::SubAssign<Duration> for Instant {
-    fn sub_assign(&mut self, rhs: Duration) {
-        *self = *self - rhs;
     }
 }
 
@@ -219,5 +198,16 @@ mod variant {
 
     pub(super) fn now() -> Instant {
         crate::time::clock::now()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Confirm `far_future` works on all supported platforms
+    #[test]
+    fn instant_far_future_doesnt_panic() {
+        let _ = Instant::far_future();
     }
 }
