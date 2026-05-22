@@ -30,7 +30,7 @@ use std::task::{self, ready, Poll};
 ///
 /// # #[tokio::main(flavor = "current_thread")]
 /// # async fn main() {
-/// sleep_until(Instant::now() + Duration::from_millis(100)).await;
+/// sleep_until(Instant::now().checked_add(Duration::from_millis(100)).unwrap()).await;
 /// println!("100 ms have elapsed");
 /// # }
 /// ```
@@ -164,7 +164,8 @@ pin_project! {
     ///     tokio::select! {
     ///         () = &mut sleep => {
     ///             println!("timer elapsed");
-    ///             sleep.as_mut().reset(Instant::now() + Duration::from_millis(50));
+    ///             sleep.as_mut()
+    ///                 .reset(Instant::now().checked_add(Duration::from_millis(50)).unwrap());
     ///         },
     ///     }
     /// }
@@ -341,7 +342,7 @@ impl Sleep {
     /// let sleep = tokio::time::sleep(Duration::from_millis(10));
     /// tokio::pin!(sleep);
     ///
-    /// sleep.as_mut().reset(Instant::now() + Duration::from_millis(20));
+    /// sleep.as_mut().reset(Instant::now().checked_add(Duration::from_millis(20)).unwrap());
     /// # }
     /// ```
     ///
