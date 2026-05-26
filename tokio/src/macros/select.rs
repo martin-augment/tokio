@@ -514,6 +514,39 @@ macro_rules! doc {
         /// # }
         /// ```
         ///
+        /// #### Fairness when merging more than two streams
+        ///
+        /// [`StreamExt::merge`] only balances fairness between its two operands, so chains
+        /// like `a.merge(b).merge(c)` are left-biased: the outer merge alternates between
+        /// `a.merge(b)` and `c`, which means `c` is polled roughly as often as `a` and `b`
+        /// combined. Each additional `.merge(..)` halves the share of every previously
+        /// chained stream, so fairness degrades geometrically with the number of streams.
+        ///
+        /// When merging three or more streams, prefer [`tokio_stream::StreamMap`], which
+        /// polls all of its entries with equal priority. Reusing `a`, `b`, and `c` from the
+        /// example above, the merge can be rewritten as (the explicit value type is needed so
+        /// the boxed streams unify to a single trait object):
+        ///
+        /// ```ignore
+        /// use std::pin::Pin;
+        /// use tokio_stream::{Stream, StreamExt, StreamMap};
+        ///
+        /// let mut s: StreamMap<&str, Pin<Box<dyn Stream<Item = Message>>>> =
+        ///     StreamMap::from_iter([
+        ///         ("file_channel", Box::pin(a) as _),
+        ///         ("socket",       Box::pin(b) as _),
+        ///         ("control",      Box::pin(c) as _),
+        ///     ]);
+        /// while let Some((_key, msg)) = s.next().await {
+        ///     // ...
+        /// }
+        /// ```
+        ///
+        /// See the [`StreamExt::merge`] fairness note for the underlying rule.
+        ///
+        /// [`StreamExt::merge`]: https://docs.rs/tokio-stream/0.1/tokio_stream/trait.StreamExt.html#method.merge
+        /// [`tokio_stream::StreamMap`]: https://docs.rs/tokio-stream/0.1/tokio_stream/struct.StreamMap.html
+        ///
         /// ## Racing Futures
         ///
         /// If you need to wait for the first completion among several asynchronous tasks,
