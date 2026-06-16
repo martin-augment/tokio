@@ -2,9 +2,7 @@ use crate::loom::sync::atomic::AtomicBool;
 use crate::loom::sync::Arc;
 use crate::runtime::driver::{self, Driver};
 use crate::runtime::scheduler::{self, Defer, Inject};
-use crate::runtime::task::{
-    self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task, TaskHarnessScheduleHooks,
-};
+use crate::runtime::task::{self, JoinHandle, OwnedTasks, Schedule, SpawnLocation, Task};
 use crate::runtime::{
     blocking, context, Config, MetricsBatch, SchedulerMetrics, TaskHooks, TaskMeta, WorkerMetrics,
 };
@@ -470,18 +468,35 @@ impl Handle {
         future: F,
         id: crate::runtime::task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + Send + 'static,
         F::Output: Send + 'static,
     {
+        #[cfg(tokio_unstable)]
+        let (handle, notified) = task::with_current_task_meta(|parent| {
+            me.shared.owned.bind_with_spawn_hook(
+                future,
+                me.clone(),
+                id,
+                spawned_at,
+                user_data,
+                |task| {
+                    // Safety: the task is freshly allocated and not published yet.
+                    let mut meta = unsafe { task.task_meta() };
+                    me.task_hooks.spawn(&mut meta, parent);
+                },
+            )
+        });
+        #[cfg(not(tokio_unstable))]
         let (handle, notified) = me.shared.owned.bind(future, me.clone(), id, spawned_at);
 
-        me.task_hooks.spawn(&TaskMeta {
-            id,
-            spawned_at,
-            _phantom: Default::default(),
-        });
+        #[cfg(not(tokio_unstable))]
+        {
+            let mut meta = TaskMeta::new(id, spawned_at);
+            me.task_hooks.spawn(&mut meta, None);
+        }
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -503,23 +518,43 @@ impl Handle {
         future: F,
         id: crate::runtime::task::Id,
         spawned_at: SpawnLocation,
+        #[cfg(tokio_unstable)] user_data: Option<crate::runtime::TaskData>,
     ) -> JoinHandle<F::Output>
     where
         F: crate::future::Future + 'static,
         F::Output: 'static,
     {
-        // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
+        #[cfg(tokio_unstable)]
+        let (handle, notified) = task::with_current_task_meta(|parent| {
+            let before_bind = |task: &Task<Arc<Handle>>| {
+                // Safety: the task is freshly allocated and not published yet.
+                let mut meta = unsafe { task.task_meta() };
+                me.task_hooks.spawn(&mut meta, parent);
+            };
+            // Safety: the caller guarantees that this is only called on a `LocalRuntime`.
+            unsafe {
+                me.shared.owned.bind_local_with_spawn_hook(
+                    future,
+                    me.clone(),
+                    id,
+                    spawned_at,
+                    user_data,
+                    before_bind,
+                )
+            }
+        });
+        #[cfg(not(tokio_unstable))]
         let (handle, notified) = unsafe {
             me.shared
                 .owned
                 .bind_local(future, me.clone(), id, spawned_at)
         };
 
-        me.task_hooks.spawn(&TaskMeta {
-            id,
-            spawned_at,
-            _phantom: Default::default(),
-        });
+        #[cfg(not(tokio_unstable))]
+        {
+            let mut meta = TaskMeta::new(id, spawned_at);
+            me.task_hooks.spawn(&mut meta, None);
+        }
 
         if let Some(notified) = notified {
             me.schedule(notified);
@@ -692,13 +727,19 @@ impl Schedule for Arc<Handle> {
         });
     }
 
-    fn hooks(&self) -> TaskHarnessScheduleHooks {
-        TaskHarnessScheduleHooks {
-            task_terminate_callback: self.task_hooks.task_terminate_callback.clone(),
-        }
-    }
-
     cfg_unstable! {
+        fn task_terminate_callback(&self, meta: &mut TaskMeta<'_>) {
+            self.task_hooks.task_terminate_callback(meta);
+        }
+
+        fn task_poll_start_callback(&self, meta: &mut TaskMeta<'_>) {
+            self.task_hooks.poll_start_callback(meta);
+        }
+
+        fn task_poll_stop_callback(&self, meta: &mut TaskMeta<'_>) {
+            self.task_hooks.poll_stop_callback(meta);
+        }
+
         fn unhandled_panic(&self) {
             use crate::runtime::UnhandledPanic;
 
@@ -820,17 +861,8 @@ impl CoreGuard<'_> {
 
                     let task = context.handle.shared.owned.assert_owner(task);
 
-                    #[cfg(tokio_unstable)]
-                    let task_meta = task.task_meta();
-
                     let (c, ()) = context.run_task(core, || {
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_start_callback(&task_meta);
-
                         task.run();
-
-                        #[cfg(tokio_unstable)]
-                        context.handle.task_hooks.poll_stop_callback(&task_meta);
                     });
 
                     core = c;
