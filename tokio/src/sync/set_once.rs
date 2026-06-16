@@ -328,6 +328,12 @@ impl<T> SetOnce<T> {
         }
     }
 
+    /// Takes ownership of the current value, leaving the cell empty. Returns
+    /// `None` if the cell is empty.
+    pub fn take(&mut self) -> Option<T> {
+        std::mem::take(self).into_inner()
+    }
+
     /// Waits until the value is set.
     ///
     /// If the `SetOnce` is already initialized, it will return the value
