@@ -69,7 +69,7 @@ impl TcpListener {
         /// to this listener. The port allocated can be queried via the `local_addr`
         /// method.
         ///
-        /// The address type can be any implementor of the [`ToSocketAddrs`] trait.
+        /// The address type can be any implementer of the [`ToSocketAddrs`] trait.
         /// If `addr` yields multiple addresses, bind will be attempted with each of
         /// the addresses until one succeeds and returns the listener. If none of
         /// the addresses succeed in creating a listener, the error returned from
@@ -133,8 +133,8 @@ impl TcpListener {
     ///
     /// # Cancel safety
     ///
-    /// This method is cancel safe. If the method is used as the event in a
-    /// [`tokio::select!`](crate::select) statement and some other branch
+    /// This method is cancel safe. If the method is used as a branch in
+    /// [`tokio::select!`](crate::select) and another branch
     /// completes first, then it is guaranteed that no new connections were
     /// accepted by this method.
     ///

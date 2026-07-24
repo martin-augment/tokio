@@ -3,7 +3,9 @@ pub(crate) use self::level::Expiration;
 use self::level::Level;
 
 use super::cancellation_queue::Sender;
-use super::{EntryHandle, EntryList, WakeQueue};
+use super::{Entry, EntryHandle, WakeQueue};
+
+use crate::util::linked_list::LinkedList;
 
 /// Hashed timing wheel implementation.
 ///
@@ -52,7 +54,7 @@ impl Wheel {
         self.elapsed
     }
 
-    /// Inserts an entry into the timing wheel.
+    /// Inserts an entry into the timing wheel
     ///
     /// # Arguments
     ///
@@ -68,7 +70,10 @@ impl Wheel {
 
         assert!(deadline > self.elapsed);
 
-        hdl.register_cancel_tx(cancel_tx);
+        if !hdl.register_cancel_tx(cancel_tx) {
+            // `hdl` has been cancelled or woken up concurrently
+            return;
+        }
 
         // Get the level at which the entry should be stored
         let level = self.level_for(deadline);
@@ -202,7 +207,7 @@ impl Wheel {
     }
 
     /// Obtains the list of entries that need processing for the given expiration.
-    fn take_entries(&mut self, expiration: &Expiration) -> EntryList {
+    fn take_entries(&mut self, expiration: &Expiration) -> LinkedList<Entry> {
         self.levels[expiration.level].take_slot(expiration.slot)
     }
 
