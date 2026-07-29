@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io::{Error, ErrorKind};
 use std::mem::MaybeUninit;
 
 /// A wrapper around a byte buffer that is incrementally filled and initialized.
@@ -24,6 +25,11 @@ pub struct ReadBuf<'a> {
     buf: &'a mut [MaybeUninit<u8>],
     filled: usize,
     initialized: usize,
+}
+
+#[derive(Debug)]
+pub struct ReadBufSnapshot {
+    filled: usize,
 }
 
 impl<'a> ReadBuf<'a> {
@@ -83,6 +89,63 @@ impl<'a> ReadBuf<'a> {
         let max = std::cmp::min(self.remaining(), n);
         // Safety: We don't set any of the `unfilled_mut` with `MaybeUninit::uninit`.
         unsafe { ReadBuf::uninit(&mut self.unfilled_mut()[..max]) }
+    }
+
+    /// Returns a new `ReadBufSnapshot` containing the current length of the filled portion
+    /// of the buffer. Useful for comparing the state of the buffer before and after a read
+    /// operation performed on a sub-buffer created by `ReadBuf::take`.
+    #[inline]
+    pub fn snapshot(&self) -> ReadBufSnapshot {
+        ReadBufSnapshot {
+            filled: self.filled().len(),
+        }
+    }
+
+    /// Updates the `ReadBuf` after a read operation using snapshots captured before and after
+    /// polling a sub-buffer created by `ReadBuf::take`.
+    ///
+    /// Returns the number of bytes (`n`) that were written into the buffer during the read operation.
+    ///
+    /// # Errors
+    ///
+    /// - Returns an error if `after_poll.filled < before_poll.filled`.
+    ///   would exceed the remaining capacity of the buffer.
+    /// - Returns an error if advancing by the number of bytes read (`n = after_poll.filled - before_poll.filled`)
+    ///   would exceed the remaining capacity of the buffer
+    ///
+    /// # Safety
+    ///
+    /// - The caller must ensure that `n` bytes indicated by
+    ///   `after_poll.filled - before_poll.filled` were actually initialized
+    ///   in the buffer by the read operation. Failing to uphold this condition
+    ///   could result in undefined behavior.
+    #[inline]
+    pub unsafe fn finalize_read_from_snapshots(
+        &mut self,
+        before_poll: ReadBufSnapshot,
+        after_poll: ReadBufSnapshot,
+    ) -> Result<usize, Error> {
+        if after_poll.filled < before_poll.filled {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "after_poll is smaller than before_poll",
+            ));
+        }
+        let n = after_poll.filled - before_poll.filled;
+
+        if self.filled().len() + n > self.capacity() {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                "attempted to advance beyond buffer capacity",
+            ));
+        }
+
+        // We need to update the original ReadBuf
+        unsafe {
+            self.assume_init(n);
+        }
+        self.advance(n);
+        Ok(n)
     }
 
     /// Returns a shared reference to the initialized portion of the buffer.
